@@ -1,14 +1,16 @@
+import streamlit as st
 from ultralytics import YOLO
 import cv2
 import numpy as np
 
 class PoseEstimator:
+    @st.cache_resource
     def __init__(self, model_name="yolov8n-pose.pt"):
         self.model = YOLO(model_name)
         self.skeleton = [
-            (5,6), (5,7), (7,9), (6,8), (8,10),
-            (5,11), (6,12), (11,12),
-            (11,13), (13,15), (12,14), (14,16)
+            (5,6), (5,7), (7,9), (6,8), (8,10),  # arms
+            (5,11), (6,12), (11,12),              # torso
+            (11,13), (13,15), (12,14), (14,16)    # legs
         ]
         self.colors = {
             "good": (0,255,0),
