@@ -3,10 +3,15 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 
+@st.cache_resource
+def load_model(model_name="yolov8n-pose.pt"):
+    """Load and cache the YOLO model globally."""
+    return YOLO(model_name)
+
 class PoseEstimator:
-    @st.cache_resource
     def __init__(self, model_name="yolov8n-pose.pt"):
-        self.model = YOLO(model_name)
+        # Use the cached loader
+        self.model = load_model(model_name)
         self.skeleton = [
             (5,6), (5,7), (7,9), (6,8), (8,10),  # arms
             (5,11), (6,12), (11,12),              # torso
