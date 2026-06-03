@@ -1,17 +1,21 @@
-import streamlit as st
 from ultralytics import YOLO
 import cv2
 import numpy as np
 
-@st.cache_resource
-def load_model(model_name="yolov8n-pose.pt"):
-    """Load and cache the YOLO model globally."""
-    return YOLO(model_name)
+# Global variable to hold the model after first load
+_model = None
+
+def get_model():
+    """Load the YOLO model once and reuse it."""
+    global _model
+    if _model is None:
+        _model = YOLO("yolov8n-pose.pt")
+    return _model
 
 class PoseEstimator:
-    def __init__(self, model_name="yolov8n-pose.pt"):
-        # Use the cached loader
-        self.model = load_model(model_name)
+    def __init__(self):
+        # Use the global model – no caching, no hashing issues
+        self.model = get_model()
         self.skeleton = [
             (5,6), (5,7), (7,9), (6,8), (8,10),  # arms
             (5,11), (6,12), (11,12),              # torso
