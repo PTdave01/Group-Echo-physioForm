@@ -15,7 +15,16 @@ from utils.session_manager import SessionManager
 st.set_page_config(page_title="Patient – PhysioForm", layout="wide")
 st.title("🧑‍⚕️ Patient Exercise Session (Live Stream)")
 
-patient_id = st.text_input("Enter your Patient ID", value="patient_001")
+# ── Login check ─────────────────────────────────────────────────────
+if "user" not in st.session_state or st.session_state.user is None:
+    st.warning("Please log in first.")
+    st.page_link("pages/0_Login.py", label="Go to Login")
+    st.stop()
+
+# Automatically use the patient's email as their unique ID
+patient_id = st.session_state.user["email"]
+st.info(f"Logged in as: **{patient_id}**")
+
 exercise_choice = st.selectbox("Choose your exercise (or auto-detect)", ["Auto-detect", "Biceps Curl", "Squat"])
 
 if "recognized_exercise" not in st.session_state:
@@ -33,7 +42,6 @@ class PhysioVideoProcessor(VideoProcessorBase):
         self.analyzer = analyzer
         self.lock = threading.Lock()
         self.start_time = time.time()
-        # Fresh rep_state dict – no old keys
         self.rep_state = {}
         self.rep_count = 0
         self.form_quality_history = []
@@ -47,18 +55,22 @@ class PhysioVideoProcessor(VideoProcessorBase):
             keypoints, bbox = self.pose.get_keypoints(img)
 
             with self.lock:
-                if (exercise_choice == "Auto-detect" and self.exercise is None) or st.session_state.get("exercise_override"):
-                    if len(self.angle_buffer) < 60:
-                        if keypoints is not None:
-                            angles = self.analyzer.calc_all_angles(keypoints)
-                            self.angle_buffer.append(angles)
-                    else:
-                        self.exercise = self.analyzer.recognize_exercise(self.angle_buffer)
-                        st.session_state.recognized_exercise = self.exercise
-                        self.angle_buffer.clear()
+                # Determine exercise
+                if exercise_choice == "Auto-detect":
+                    if self.exercise is None:
+                        if len(self.angle_buffer) < 60:
+                            if keypoints is not None:
+                                angles = self.analyzer.calc_all_angles(keypoints)
+                                self.angle_buffer.append(angles)
+                        else:
+                            self.exercise = self.analyzer.recognize_exercise(self.angle_buffer)
+                            st.session_state.recognized_exercise = self.exercise
+                            self.angle_buffer.clear()
                 else:
-                    self.exercise = exercise_choice if exercise_choice != "Auto-detect" else self.exercise
+                    self.exercise = exercise_choice
+                    st.session_state.recognized_exercise = exercise_choice
 
+                # Process form
                 if self.exercise and keypoints is not None:
                     feedback, color_guide, rep_done = self.analyzer.evaluate_form(
                         self.exercise, keypoints, self.rep_state
@@ -117,9 +129,11 @@ if st.button("End Session & Save"):
     if webrtc_ctx.video_processor:
         processor = webrtc_ctx.video_processor
         avg_quality = np.mean(processor.form_quality_history) if processor.form_quality_history else 0.0
+        saved_exercise = processor.exercise or st.session_state.recognized_exercise or "unknown"
+        # Save using the logged‑in patient ID (email)
         session_manager.save_session(
             patient_id=patient_id,
-            exercise=st.session_state.recognized_exercise or "unknown",
+            exercise=saved_exercise,
             reps=processor.rep_count,
             avg_form_quality=avg_quality,
             duration=duration
