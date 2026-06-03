@@ -1,5 +1,7 @@
 import streamlit as st
 from supabase import create_client, Client
+from utils.style import set_page_style
+set_page_style()
 
 st.set_page_config(page_title="Login – PhysioForm", layout="wide")
 
