@@ -4,8 +4,8 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Login – PhysioForm", layout="wide")
 
 # Initialize Supabase client (using secrets)
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
+url = st.secrets["https://wnwktjulzpvqojpakunr.supabase.co"]
+key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indud2t0anVsenB2cW9qcGFrdW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzY2MzcsImV4cCI6MjA5NjA1MjYzN30.7yYPDJeULk5YCih--0alw6l4lLAYtS4lYsUJH7JaCeE"]
 supabase: Client = create_client(url, key)
 
 if "user" in st.session_state and st.session_state.user is not None:
