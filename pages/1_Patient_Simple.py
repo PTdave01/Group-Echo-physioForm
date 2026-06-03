@@ -11,22 +11,27 @@ from utils.exercise_analyzer import ExerciseAnalyzer
 from utils.session_manager import SessionManager
 
 st.set_page_config(page_title="Patient (Simple) – PhysioForm", layout="wide")
-st.title("🧑‍⚕️ Patient Exercise Session")
+st.title("🧑‍⚕️ Patient Exercise Session (Photo Mode)")
 
-patient_id = st.text_input("Enter your Patient ID", value="patient_001")
+if "user" not in st.session_state or st.session_state.user is None:
+    st.warning("Please log in first.")
+    st.page_link("pages/0_Login.py", label="Go to Login")
+    st.stop()
+
+patient_id = st.session_state.user["email"]
+st.info(f"Logged in as: **{patient_id}**")
 exercise_choice = st.selectbox("Choose your exercise", ["Biceps Curl", "Squat"])
 
 pose = PoseEstimator()
 analyzer = ExerciseAnalyzer()
 session_mgr = SessionManager()
 
-# Initialize session state
 if "running" not in st.session_state:
     st.session_state.running = False
 if "rep_count" not in st.session_state:
     st.session_state.rep_count = 0
 if "rep_state" not in st.session_state:
-    st.session_state.rep_state = {"curl": "down", "squat": "up"}
+    st.session_state.rep_state = {}
 
 col1, col2 = st.columns(2)
 start_stop = col1.button("Start" if not st.session_state.running else "Stop")
@@ -34,22 +39,18 @@ if start_stop:
     st.session_state.running = not st.session_state.running
     if st.session_state.running:
         st.session_state.rep_count = 0
-        st.session_state.rep_state = {"curl": "down", "squat": "up"}
+        st.session_state.rep_state = {}
 
 frame_placeholder = st.empty()
 rep_metric = st.empty()
 
 if st.session_state.running:
-    # Camera input widget (native browser camera – works on any network)
     camera_image = st.camera_input("📸 Point your camera", key="live_cam")
-    
     if camera_image is not None:
-        # Convert to OpenCV image
         bytes_data = camera_image.getvalue()
         nparr = np.frombuffer(bytes_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Run pose estimation
         keypoints, bbox = pose.get_keypoints(img)
 
         if keypoints is not None:
@@ -63,26 +64,19 @@ if st.session_state.running:
         else:
             img = pose.draw_text(img, "No person detected", (50, 50))
 
-        # Display processed image
         frame_placeholder.image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), channels="RGB")
-
-        # Update rep metric
         rep_metric.metric("Reps Completed", st.session_state.rep_count)
 
-        # Auto-refresh after a short delay (by causing a rerun)
         time.sleep(0.2)
         st.rerun()
-
     else:
         frame_placeholder.info("Tap 'Take Photo' to capture a frame.")
 else:
     frame_placeholder.info("Press 'Start' to begin your exercise session.")
     rep_metric.metric("Reps Completed", 0)
 
-# Save session
 if st.button("End Session & Save") and st.session_state.running:
-    # Simulate a duration (since we don't track exact time)
-    duration = 60  # approximate
+    duration = 60
     session_mgr.save_session(patient_id, exercise_choice, st.session_state.rep_count, 0.8, duration)
     st.success("Session saved! Clinician can now view your progress.")
     st.session_state.running = False
