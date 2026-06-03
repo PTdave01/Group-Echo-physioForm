@@ -3,16 +3,14 @@ import streamlit as st
 def set_page_style():
     st.markdown("""
     <style>
-    /* ── Full‑screen clinical background image (physiotherapist & patient) ── */
+    /* ── Full‑screen clinical background image (high‑quality, reliable) ── */
     .stApp {
-        background-color: #e0f2fe;   /* fallback if image doesn't load */
-        background-image: url("https://images.unsplash.com/photo-1576091160550-2173dba999e5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80");
+        background: url("https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80") no-repeat center center fixed;
         background-size: cover;
-        background-position: center 30%;
-        background-attachment: scroll;   /* better mobile support */
+        background-color: #e0f2fe;   /* fallback if image fails */
     }
 
-    /* ── VERY light white overlay – image stays perfectly visible ── */
+    /* ── Transparent overlay – extremely light, barely visible ── */
     .stApp::before {
         content: "";
         position: fixed;
@@ -20,18 +18,18 @@ def set_page_style():
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(255, 255, 255, 0.15);   /* almost transparent */
+        background: rgba(255, 255, 255, 0.08);   /* almost nothing */
         z-index: 0;
         pointer-events: none;
     }
 
-    /* ── Main content card – semi‑transparent with blur (text remains crisp) ── */
+    /* ── Main content card – let the image shine through ── */
     .block-container {
         position: relative;
         z-index: 1;
-        background: rgba(255, 255, 255, 0.82);   /* slightly see‑through */
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.72);   /* more transparent */
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         border-radius: 24px;
         padding: 2rem 3rem;
         margin-top: 1.5rem;
