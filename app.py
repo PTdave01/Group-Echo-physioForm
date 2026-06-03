@@ -1,8 +1,7 @@
 import streamlit as st
-
-st.set_page_config(page_title="PhysioForm", page_icon="🩺", layout="wide")
 from utils.style import set_page_style
 set_page_style()
+st.set_page_config(page_title="PhysioForm", page_icon="🩺", layout="wide")
 
 # Check if user is logged in
 if "user" not in st.session_state or st.session_state.user is None:
