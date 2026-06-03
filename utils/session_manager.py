@@ -1,32 +1,24 @@
-import json
-import os
-import time
+import streamlit as st
+from supabase import create_client, Client
+from datetime import datetime
 
 class SessionManager:
-    def __init__(self, filepath="sessions.json"):
-        self.filepath = filepath
-        if not os.path.exists(filepath):
-            with open(filepath, 'w') as f:
-                json.dump([], f)
+    def __init__(self):
+        self.url = st.secrets["SUPABASE_URL"]
+        self.key = st.secrets["SUPABASE_KEY"]
+        self.supabase: Client = create_client(self.url, self.key)
 
     def save_session(self, patient_id, exercise, reps, avg_form_quality, duration):
-        session = {
+        data = {
             "patient_id": patient_id,
             "exercise": exercise,
             "reps": reps,
             "avg_form_quality": avg_form_quality,
             "duration": duration,
-            "start_time": time.time() - duration
+            "start_time": int(datetime.now().timestamp())
         }
-        with open(self.filepath, 'r+') as f:
-            data = json.load(f)
-            data.append(session)
-            f.seek(0)
-            json.dump(data, f, indent=2)
+        self.supabase.table("sessions").insert(data).execute()
 
     def load_all_sessions(self):
-        try:
-            with open(self.filepath, 'r') as f:
-                return json.load(f)
-        except:
-            return []
+        response = self.supabase.table("sessions").select("*").order("id", desc=True).execute()
+        return response.data if response.data else []
