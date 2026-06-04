@@ -1,25 +1,24 @@
 import streamlit as st
 from supabase import create_client, Client
-from utils.style import set_page_style
-set_page_style()
 
 st.set_page_config(page_title="Login – PhysioForm", layout="wide")
 
-# ⚠️ IMPORTANT: The strings inside st.secrets["..."] must be the secret NAMES,
-# not the actual URL or key. Write them EXACTLY as shown below.
-url = st.secrets["SUPABASE_URL"]          # ← Keep "SUPABASE_URL" as-is
-key = st.secrets["SUPABASE_KEY"]          # ← Keep "SUPABASE_KEY" as-is
-supabase: Client = create_client(url, key)
-
-# If the user is already logged in, skip to exercise page
+# If already logged in, show a short page with logout
 if "user" in st.session_state and st.session_state.user is not None:
     st.success(f"You are logged in as {st.session_state.user['email']}")
+    if st.button("🚪 Logout"):
+        st.session_state.user = None
+        st.rerun()
     st.page_link("pages/1_Patient.py", label="Go to Exercise Page")
     st.stop()
 
+# ── Normal login / sign‑up (only shown when logged out) ──────────
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
+
 tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-# ── Login tab ──
 with tab1:
     st.subheader("Login to your account")
     email = st.text_input("Email", key="login_email")
@@ -35,7 +34,6 @@ with tab1:
         except Exception as e:
             st.error(f"Login failed: {e}")
 
-# ── Sign Up tab ──
 with tab2:
     st.subheader("Create a new account")
     new_email = st.text_input("Email", key="signup_email")
