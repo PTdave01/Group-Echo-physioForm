@@ -3,13 +3,13 @@ from supabase import create_client, Client
 
 st.set_page_config(page_title="Login – PhysioForm", layout="wide")
 
-# If already logged in, show a simple page with logout
+# If already logged in, show simple page with logout & home link
 if "user" in st.session_state and st.session_state.user is not None:
     st.success(f"You are already logged in as {st.session_state.user['email']}")
     if st.button("🚪 Logout"):
         st.session_state.user = None
         st.rerun()
-    st.page_link("app.py", label="Go to Home")
+    st.page_link("app.py", label="🏠 Go to Home")
     st.stop()
 
 # ── Normal login / sign‑up ──
@@ -30,7 +30,7 @@ with tab1:
             if user:
                 st.session_state.user = {"id": user.id, "email": user.email}
                 st.success("Logged in successfully!")
-                st.switch_page("app.py")
+                st.rerun()   # will show the "already logged in" view, then user can go home
         except Exception as e:
             st.error(f"Login failed: {e}")
 
@@ -51,6 +51,6 @@ with tab2:
                 if user:
                     st.session_state.user = {"id": user.id, "email": user.email}
                     st.success("Account created and logged in!")
-                    st.switch_page("app.py")
+                    st.rerun()
             except Exception as e:
                 st.error(f"Sign up failed: {e}")
