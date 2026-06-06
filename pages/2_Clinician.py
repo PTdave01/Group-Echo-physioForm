@@ -368,7 +368,7 @@ if not filtered_df.empty:
         quality_by_exercise = filtered_df.groupby('exercise')['avg_form_quality_pct'].mean().reset_index()
         quality_by_exercise = quality_by_exercise.sort_values('avg_form_quality_pct', ascending=True)
         
-        fig3 = px.barh(
+        fig3 = px.bar(
             quality_by_exercise,
             x='avg_form_quality_pct',
             y='exercise',
