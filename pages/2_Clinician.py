@@ -391,7 +391,7 @@ if not filtered_df.empty:
         reps_by_exercise = filtered_df.groupby('exercise')['reps'].mean().reset_index()
         reps_by_exercise = reps_by_exercise.sort_values('reps', ascending=True)
         
-        fig4 = px.barh(
+        fig4 = px.bar(
             reps_by_exercise,
             x='reps',
             y='exercise',
