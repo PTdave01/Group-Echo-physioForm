@@ -1,8 +1,8 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="PhysioForm", 
-    page_icon="🩺", 
+    page_title="PhysioForm",
+    page_icon="🩺",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -13,24 +13,24 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         font-size: 2.5rem;
     }
-    .welcome-header {
+   .welcome-header {
         background: linear-gradient(135deg, #0066CC 0%, #0084FF 100%);
         padding: 2rem;
         border-radius: 10px;
         color: white;
         margin-bottom: 2rem;
     }
-    .welcome-header h1 {
+   .welcome-header h1 {
         margin: 0;
         font-size: 2.5rem;
         font-weight: 700;
     }
-    .welcome-header p {
+   .welcome-header p {
         margin: 0.5rem 0 0 0;
         font-size: 1.1rem;
         opacity: 0.95;
     }
-    .feature-card {
+   .feature-card {
         background: white;
         padding: 1.5rem;
         border-radius: 8px;
@@ -38,20 +38,20 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         transition: transform 0.2s;
     }
-    .feature-card:hover {
+   .feature-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.12);
     }
-    .feature-card h3 {
+   .feature-card h3 {
         margin-top: 0;
         color: #0066CC;
     }
-    .button-container {
+   .button-container {
         display: flex;
         gap: 1rem;
         margin-top: 2rem;
     }
-    .metric-card {
+   .metric-card {
         background: white;
         padding: 1.5rem;
         border-radius: 10px;
@@ -59,14 +59,14 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         border-top: 4px solid #10B981;
     }
-    .metric-card h3 {
+   .metric-card h3 {
         margin: 0 0 0.5rem 0;
         color: #6B7280;
         font-size: 0.875rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    .metric-card .value {
+   .metric-card.value {
         font-size: 1.8rem;
         font-weight: 700;
         color: #0066CC;
@@ -83,9 +83,9 @@ if "user" not in st.session_state or st.session_state.user is None:
         <p>AI-Powered Home Physiotherapy Platform</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     st.markdown("### Why Choose PhysioForm?")
-    
+
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("""
@@ -94,7 +94,7 @@ if "user" not in st.session_state or st.session_state.user is None:
             Real-time analysis of your exercise form with instant feedback.
         </div>
         """, unsafe_allow_html=True)
-    
+
     with col2:
         st.markdown("""
         <div class="feature-card">
@@ -102,7 +102,7 @@ if "user" not in st.session_state or st.session_state.user is None:
             Professional tracking and progress monitoring by your therapist.
         </div>
         """, unsafe_allow_html=True)
-    
+
     with col3:
         st.markdown("""
         <div class="feature-card">
@@ -110,53 +110,39 @@ if "user" not in st.session_state or st.session_state.user is None:
             Complete your physiotherapy exercises from anywhere.
         </div>
         """, unsafe_allow_html=True)
-    
+
     st.divider()
     st.markdown("### Get Started")
-    
+
     col1, col2 = st.columns(2)
     with col1:
-        st.link_button(
-            "🔐 Login / Sign Up",
-            "pages/0_Login.py",
-            use_container_width=True,
-            type="primary"
-        )
+        if st.button("🔐 Login / Sign Up", use_container_width=True, type="primary"):
+            st.switch_page("pages/0_Login.py")
     with col2:
-        st.link_button(
-            "👨‍⚕️ Clinician Dashboard",
-            "pages/2_Clinician.py",
-            use_container_width=True
-        )
+        if st.button("👨‍⚕️ Clinician Dashboard", use_container_width=True):
+            st.switch_page("pages/2_Clinician.py")
 
 # ── Logged in ───────────────────────────────────────────────────────
 else:
     user_first_name = st.session_state.user['email'].split('@')[0]
-    
+
     st.markdown(f"""
     <div class="welcome-header">
         <h1>Welcome back, {user_first_name}! 👋</h1>
         <p>Let's continue your therapy journey</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
     with col1:
-        st.link_button(
-            "🏃 Start Exercise Session",
-            "pages/1_Patient.py",
-            use_container_width=True,
-            type="primary"
-        )
+        if st.button("🏃 Start Exercise Session", use_container_width=True, type="primary"):
+            st.switch_page("pages/1_Patient.py")
     with col2:
-        st.link_button(
-            "📊 View Your Progress",
-            "pages/3_Progress.py",
-            use_container_width=True
-        )
-    
+        if st.button("📊 View Your Progress", use_container_width=True):
+            st.switch_page("pages/3_Progress.py")
+
     st.divider()
-    
+
     # Quick stats for logged-in users
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -183,7 +169,7 @@ else:
             <p style="margin: 0.5rem 0 0 0; color: #10B981; font-size: 0.875rem;">↑ 2%</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     st.divider()
     if st.button("🚪 Logout", use_container_width=True):
         st.session_state.user = None
