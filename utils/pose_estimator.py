@@ -21,10 +21,10 @@ class PoseEstimator:
 
     def get_keypoints(self, img):
         h, w = img.shape[:2]
-        scale = 320 / max(h, w)
+        scale = 256 / max(h, w)
         small = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LINEAR)
 
-        results = self.model(small, imgsz=320, verbose=False, conf=0.35)
+        results = self.model(small, imgsz=256, verbose=False, conf=0.3)
         if not results or len(results[0].keypoints) == 0:
             return None, None
 
@@ -32,6 +32,7 @@ class PoseEstimator:
         conf = results[0].keypoints.conf[0].cpu().numpy()
         if np.mean(conf) < 0.3:
             return None, None
+
         return kpts, (0, 0, w, h)
 
     def draw_skeleton(self, img, keypoints, line_colors=None):
