@@ -154,7 +154,8 @@ st.title("🧑‍⚕️ Patient Exercise Session (Live Stream)")
 # ── Login check ─────────────────────────────────────────────────────
 if "user" not in st.session_state or st.session_state.user is None:
     st.warning("Please log in first.")
-    st.link_button("Go to Login", "pages/0_Login.py", use_container_width=True, type="primary")
+    if st.button("Go to Login", use_container_width=True, type="primary"):
+        st.switch_page("pages/0_Login.py")
     st.stop()
 
 # Initialize session variables
@@ -179,12 +180,12 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Exercise selection
+# Exercise selection - ONLY BICEPS AND SQUAT
 col1, col2 = st.columns([3, 1])
 with col1:
     exercise_choice = st.selectbox(
-        "Choose your exercise (or auto-detect)",
-        ["Auto-detect", "Biceps Curl", "Squat", "Shoulder Press", "Leg Raise"],
+        "Choose your exercise",
+        ["Biceps Curl", "Squat"],
         key="exercise_select"
     )
 with col2:
@@ -217,7 +218,6 @@ class PhysioVideoProcessor(VideoProcessorBase):
         self.form_quality_history = []
         self.exercise = None
         self.feedback_text = ""
-        self.angle_buffer = []
         self.current_form_quality = 0
 
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
@@ -226,20 +226,8 @@ class PhysioVideoProcessor(VideoProcessorBase):
             keypoints, bbox = self.pose.get_keypoints(img)
 
             with self.lock:
-                # Determine exercise
-                if exercise_choice == "Auto-detect":
-                    if self.exercise is None:
-                        if len(self.angle_buffer) < 60:
-                            if keypoints is not None:
-                                angles = self.analyzer.calc_all_angles(keypoints)
-                                self.angle_buffer.append(angles)
-                        else:
-                            self.exercise = self.analyzer.recognize_exercise(self.angle_buffer)
-                            st.session_state.recognized_exercise = self.exercise
-                            self.angle_buffer.clear()
-                else:
-                    self.exercise = exercise_choice
-                    st.session_state.recognized_exercise = exercise_choice
+                # Force exercise to user choice - no auto-detect
+                self.exercise = exercise_choice
 
                 # Process form
                 if self.exercise and keypoints is not None:
@@ -252,15 +240,11 @@ class PhysioVideoProcessor(VideoProcessorBase):
                     if rep_done:
                         self.rep_count += 1
                         self.form_quality_history.append(self.current_form_quality)
-                        st.session_state.rep_count = self.rep_count
-                        st.session_state.form_quality_history = self.form_quality_history
                     
                     img = self.pose.draw_skeleton(img, keypoints, color_guide)
                     img = self.analyzer.draw_feedback(img, self.feedback_text, self.rep_count, self.exercise)
                 else:
                     img = self.pose.draw_text(img, "Position yourself in frame", (50, 50))
-                    if self.exercise is None and exercise_choice == "Auto-detect":
-                        img = self.pose.draw_text(img, "Auto-detecting exercise...", (50, 90))
 
             return av.VideoFrame.from_ndarray(img, format="bgr24")
         except Exception as e:
@@ -290,22 +274,38 @@ webrtc_ctx = webrtc_streamer(
 
 st.divider()
 
-# Main metrics display
+# --- LIVE METRICS (auto-refreshing) ---
 col1, col2, col3 = st.columns(3)
+rep_ph = col1.empty()
+form_ph = col2.empty()
+ex_ph = col3.empty()
 
-with col1:
-    st.markdown(f"""
+@st.fragment(run_every=0.4)
+def update_live_metrics():
+    rep_count = st.session_state.rep_count
+    form_history = st.session_state.form_quality_history
+    exercise = st.session_state.recognized_exercise
+
+    if webrtc_ctx.video_processor:
+        with webrtc_ctx.video_processor.lock:
+            rep_count = webrtc_ctx.video_processor.rep_count
+            form_history = list(webrtc_ctx.video_processor.form_quality_history)
+            exercise = webrtc_ctx.video_processor.exercise
+        st.session_state.rep_count = rep_count
+        st.session_state.form_quality_history = form_history
+        st.session_state.recognized_exercise = exercise
+
+    rep_ph.markdown(f"""
     <div class="metric-card">
         <h3>Reps Completed</h3>
-        <div class="value">{st.session_state.rep_count}</div>
+        <div class="value">{rep_count}</div>
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
-    if st.session_state.form_quality_history:
-        avg_quality = np.mean(st.session_state.form_quality_history) * 100
+    if form_history:
+        avg_quality = np.mean(form_history) * 100
         quality_indicator = "🟢 Excellent" if avg_quality >= 85 else "🟡 Good" if avg_quality >= 70 else "🔴 Needs Work"
-        st.markdown(f"""
+        form_ph.markdown(f"""
         <div class="metric-card">
             <h3>Form Quality</h3>
             <div class="value">{avg_quality:.0f}%</div>
@@ -313,7 +313,7 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.markdown("""
+        form_ph.markdown("""
         <div class="metric-card">
             <h3>Form Quality</h3>
             <div class="value">-</div>
@@ -321,21 +321,22 @@ with col2:
         </div>
         """, unsafe_allow_html=True)
 
-with col3:
-    if st.session_state.recognized_exercise:
-        st.markdown(f"""
+    if exercise:
+        ex_ph.markdown(f"""
         <div class="metric-card">
             <h3>Exercise</h3>
-            <div class="value" style="font-size: 1.3rem;">{st.session_state.recognized_exercise}</div>
+            <div class="value" style="font-size: 1.3rem;">{exercise}</div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.markdown("""
+        ex_ph.markdown("""
         <div class="metric-card">
             <h3>Exercise</h3>
-            <div class="value" style="font-size: 1.2rem;">Detecting...</div>
+            <div class="value" style="font-size: 1.2rem;">-</div>
         </div>
         """, unsafe_allow_html=True)
+
+update_live_metrics()
 
 st.divider()
 
@@ -350,6 +351,11 @@ with col2:
         st.session_state.recognized_exercise = None
         st.session_state.form_quality_history = []
         st.session_state.session_start_time = time.time()
+        if webrtc_ctx.video_processor:
+            with webrtc_ctx.video_processor.lock:
+                webrtc_ctx.video_processor.rep_count = 0
+                webrtc_ctx.video_processor.form_quality_history = []
+                webrtc_ctx.video_processor.exercise = None
         st.rerun()
 
 st.divider()
