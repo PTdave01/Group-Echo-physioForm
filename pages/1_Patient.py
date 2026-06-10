@@ -21,7 +21,6 @@ st.markdown("""
     .metric-card { background: white; padding: 1.5rem; border-radius: 10px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-top: 4px solid #0066CC; margin-bottom: 1rem; }
     .metric-card h3 { margin: 0 0 0.5rem 0; color: #6B7280; font-size: 0.875rem; text-transform: uppercase; }
     .metric-card .value { font-size: 2.5rem; font-weight: 700; color: #0066CC; }
-    .set-badge { background: #10B981; color: white; padding: 0.25rem 1rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; display: inline-block; margin-top: 0.25rem; }
     .done-btn button { background: #059669 !important; border: none !important; font-size: 1.5rem !important; padding: 1.5rem 3rem !important; border-radius: 15px !important; transition: 0.2s; }
     .done-btn button:hover { background: #047857 !important; transform: scale(1.02); }
 </style>
@@ -38,7 +37,7 @@ if "user" not in st.session_state or st.session_state.user is None:
 
 patient_id = st.session_state.user["email"]
 
-# ── Initialise persistent state ────────────────────────────────────
+# ── Initialise persistent session variables ────────────────────────
 if "session_start_time" not in st.session_state:
     st.session_state.session_start_time = time.time()
 if "sets_completed" not in st.session_state:
@@ -62,7 +61,7 @@ pose_estimator = PoseEstimator()
 analyzer = ExerciseAnalyzer()
 session_manager = SessionManager()
 
-# ── Callback for auto‑set saving ───────────────────────────────────
+# ── Auto‑set callback (runs in processor thread) ─────────────────
 def on_set_completed(set_exercise, set_reps, avg_quality):
     """Called every 10 reps. Saves a set immediately."""
     session_manager.save_session(
@@ -108,11 +107,11 @@ class PhysioVideoProcessor(VideoProcessorBase):
                         self.rep_count += 1
                         self.form_quality_history.append(quality)
 
-                    # Draw skeleton & feedback
+                    # Draw skeleton & feedback on the video frame
                     img = self.pose.draw_skeleton(img, keypoints, color_guide)
                     img = self.analyzer.draw_feedback(img, feedback, self.rep_count, self.exercise)
 
-                    # Auto‑set detection (every 10 reps)
+                    # Auto‑set detection (every 10 new reps)
                     new_reps_since_save = self.rep_count - self.last_set_rep_count
                     if new_reps_since_save >= 10:
                         last_10_qualities = self.form_quality_history[-10:]
@@ -122,13 +121,6 @@ class PhysioVideoProcessor(VideoProcessorBase):
                         self.last_set_rep_count = self.rep_count
                 else:
                     img = self.pose.draw_text(img, "Position yourself in frame", (50, 50))
-
-                # Update live session state (for on‑screen cards)
-                st.session_state.live_rep_count = self.rep_count
-                st.session_state.live_form_quality = (
-                    np.mean(self.form_quality_history) if self.form_quality_history else 0.0
-                )
-                st.session_state.live_exercise = self.exercise or exercise_choice
 
             return av.VideoFrame.from_ndarray(img, format="bgr24")
         except Exception:
@@ -160,7 +152,7 @@ if st.button("✅  DONE  –  Finish Exercise", use_container_width=True, key="d
     if webrtc_ctx.video_processor:
         processor = webrtc_ctx.video_processor
         with processor.lock:
-            # Save any remaining reps (incomplete set)
+            # Save any remaining reps as a final (possibly incomplete) set
             remaining = processor.rep_count - processor.last_set_rep_count
             if remaining > 0:
                 remaining_qualities = processor.form_quality_history[-remaining:] if processor.form_quality_history else []
@@ -174,7 +166,7 @@ if st.button("✅  DONE  –  Finish Exercise", use_container_width=True, key="d
                 )
             total_reps = processor.rep_count
             avg_all = np.mean(processor.form_quality_history) if processor.form_quality_history else 0.0
-        # Final session record (summary)
+        # Final session summary
         session_manager.save_session(
             patient_id=patient_id,
             exercise=exercise_choice,
@@ -183,70 +175,79 @@ if st.button("✅  DONE  –  Finish Exercise", use_container_width=True, key="d
             duration=time.time() - st.session_state.session_start_time
         )
         st.success("🎉 Session saved! Your clinician can now review your progress.")
-        # Clean up all session state
-        for key in ["live_rep_count", "live_form_quality", "live_exercise", "sets_completed",
-                    "last_auto_set_rep", "auto_save_message", "session_start_time"]:
+        # Clean up session state
+        for key in ["sets_completed", "last_auto_set_rep", "auto_save_message", "session_start_time"]:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
 
 st.caption("Press **DONE** when you finish your exercise, even if you haven’t completed a full set of 10 reps.")
 
-# ── Live metrics (auto‑refreshing) – now with Sets card ─────────────
-@st.fragment(run_every=1)
-def show_live_metrics():
-    rep_count = st.session_state.get("live_rep_count", 0)
-    avg_quality = st.session_state.get("live_form_quality", 0.0) * 100
-    exercise = st.session_state.get("live_exercise", exercise_choice)
-    sets = st.session_state.get("sets_completed", 0)
-    message = st.session_state.get("auto_save_message", "")
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>Reps</h3>
-            <div class="value">{rep_count}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>Sets</h3>
-            <div class="value">{sets}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        indicator = "🟢 Excellent" if avg_quality >= 85 else "🟡 Good" if avg_quality >= 70 else "🔴 Needs Work"
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>Form Quality</h3>
-            <div class="value">{avg_quality:.0f}%</div>
-            <div style="font-size:0.9rem;">{indicator}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3>Exercise</h3>
-            <div class="value" style="font-size:1.4rem;">{exercise}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    if message:
-        st.success(message)
-        st.session_state.auto_save_message = ""
-
-show_live_metrics()
-
-# ── Cancel link ────────────────────────────────────────────────────
+# ── Manual Refresh Stats button ────────────────────────────────────
 st.divider()
-col_empty, col_cancel = st.columns([3, 1])
-with col_cancel:
-    if st.button("❌ Cancel Session", use_container_width=True):
-        for key in ["live_rep_count", "live_form_quality", "live_exercise", "sets_completed",
-                    "last_auto_set_rep", "auto_save_message", "session_start_time"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.info("Session cancelled. No data was saved.")
-        st.switch_page("app.py")
+st.subheader("📊 Current Session Stats (tap to refresh)")
+
+col_refresh, _ = st.columns([1, 3])
+with col_refresh:
+    refresh_clicked = st.button("🔄 Refresh Stats", use_container_width=True)
+
+# Gather stats from processor (if available)
+rep_count = 0
+avg_quality = 0.0
+sets = st.session_state.get("sets_completed", 0)
+exercise = exercise_choice
+
+if webrtc_ctx.video_processor:
+    processor = webrtc_ctx.video_processor
+    with processor.lock:
+        rep_count = processor.rep_count
+        if processor.form_quality_history:
+            avg_quality = np.mean(processor.form_quality_history) * 100
+        exercise = processor.exercise or exercise_choice
+
+# Display the four metric cards
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <h3>Reps</h3>
+        <div class="value">{rep_count}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <h3>Sets</h3>
+        <div class="value">{sets}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col3:
+    indicator = "🟢 Excellent" if avg_quality >= 85 else "🟡 Good" if avg_quality >= 70 else "🔴 Needs Work"
+    st.markdown(f"""
+    <div class="metric-card">
+        <h3>Form Quality</h3>
+        <div class="value">{avg_quality:.0f}%</div>
+        <div style="font-size:0.9rem;">{indicator}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col4:
+    st.markdown(f"""
+    <div class="metric-card">
+        <h3>Exercise</h3>
+        <div class="value" style="font-size:1.4rem;">{exercise}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Show auto‑save message if any
+if st.session_state.auto_save_message:
+    st.success(st.session_state.auto_save_message)
+    st.session_state.auto_save_message = ""
+
+# ── Cancel session ─────────────────────────────────────────────────
+st.divider()
+if st.button("❌ Cancel Session", use_container_width=True):
+    for key in ["sets_completed", "last_auto_set_rep", "auto_save_message", "session_start_time"]:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.info("Session cancelled. No data was saved.")
+    st.switch_page("app.py")
