@@ -7,7 +7,7 @@ _model = None
 def get_model():
 global _model
 if _model is None:
-_model = YOLO(“yolov8n-pose.pt”)
+_model = YOLO("yolov8n-pose.pt")
 return _model
 
 class PoseEstimator:
