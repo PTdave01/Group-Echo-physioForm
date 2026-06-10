@@ -2,11 +2,6 @@ import numpy as np
 import cv2
 
 class ExerciseAnalyzer:
-    """
-    Real‑time form analyser for Biceps Curl and Squat.
-    Uses joint angles with a stability debounce to avoid miscounting.
-    """
-
     KP = {
         "left_shoulder": 5, "right_shoulder": 6,
         "left_elbow": 7, "right_elbow": 8,
@@ -16,11 +11,10 @@ class ExerciseAnalyzer:
         "left_ankle": 15, "right_ankle": 16
     }
 
-    # Number of consecutive frames the angle must stay in a zone before a rep counts
-    STABILITY_FRAMES = 3   # ~0.2 sec at 15 fps – fast but not jittery
+    # Increased to avoid double‑counting from tiny oscillations
+    STABILITY_FRAMES = 5   # ~0.33 sec at 15 fps
 
     def calc_angle(self, a, b, c):
-        """Angle at point b (shoulder‑elbow‑wrist or hip‑knee‑ankle)."""
         a = np.array(a[:2], dtype=np.float32)
         b = np.array(b[:2], dtype=np.float32)
         c = np.array(c[:2], dtype=np.float32)
@@ -31,12 +25,8 @@ class ExerciseAnalyzer:
         return angle
 
     def evaluate_form(self, exercise, keypoints, rep_state):
-        """
-        Returns (feedback_text, line_colors_dict, rep_completed_bool).
-        """
         if keypoints is None:
             return "No pose detected", {}, False
-
         if exercise == "Biceps Curl":
             return self._curl_form(keypoints, rep_state)
         elif exercise == "Squat":
@@ -44,11 +34,9 @@ class ExerciseAnalyzer:
         return "", {}, False
 
     def _is_visible(self, kp, idx):
-        """Check if a keypoint is visible (not at origin)."""
         return kp[idx][0] > 1e-5 and kp[idx][1] > 1e-5
 
     def _curl_form(self, kp, s):
-        """Biceps curl: rep counted when arm moves from extended → curled."""
         s.setdefault("curl_state", "down")
         s.setdefault("stable", 0)
         s.setdefault("prev_zone", None)
@@ -56,8 +44,8 @@ class ExerciseAnalyzer:
         feedback = "Position arm in view"
         colors = {}
         rep_done = False
-        DOWN = 145   # elbow angle for extended arm
-        UP = 75      # elbow angle for fully curled arm
+        DOWN = 145   # extended
+        UP = 75      # curled
 
         for side in ("right", "left"):
             sh = self.KP[f"{side}_shoulder"]
@@ -69,17 +57,15 @@ class ExerciseAnalyzer:
             angle = self.calc_angle(kp[sh], kp[el], kp[wr])
             zone = "down" if angle > DOWN else "up" if angle < UP else "mid"
 
-            # Stability counter
             if zone == s["prev_zone"]:
                 s["stable"] += 1
             else:
                 s["stable"] = 1
             s["prev_zone"] = zone
 
-            # Rep counting logic
             if zone == "down" and s["stable"] >= self.STABILITY_FRAMES:
                 if s["curl_state"] == "up":
-                    rep_done = True   # transition from curled to extended completes a rep
+                    rep_done = True
                 s["curl_state"] = "down"
                 feedback = f"{int(angle)}° – Now curl UP!"
             elif zone == "up" and s["stable"] >= self.STABILITY_FRAMES:
@@ -90,12 +76,10 @@ class ExerciseAnalyzer:
 
             colors[(sh, el)] = (0, 255, 0)
             colors[(el, wr)] = (0, 255, 0)
-            break   # only process one visible arm
-
+            break
         return feedback, colors, rep_done
 
     def _squat_form(self, kp, s):
-        """Squat: rep counted when standing up from a deep squat."""
         s.setdefault("squat_state", "up")
         s.setdefault("stable", 0)
         s.setdefault("prev_zone", None)
@@ -103,8 +87,8 @@ class ExerciseAnalyzer:
         feedback = "Position legs in view"
         colors = {}
         rep_done = False
-        STAND = 150   # knee angle when standing
-        DOWN = 100    # knee angle at squat depth
+        STAND = 150   # standing
+        DOWN = 100    # deep squat
 
         for side in ("right", "left"):
             hip = self.KP[f"{side}_hip"]
@@ -116,17 +100,15 @@ class ExerciseAnalyzer:
             angle = self.calc_angle(kp[hip], kp[knee], kp[ank])
             zone = "up" if angle > STAND else "down" if angle < DOWN else "mid"
 
-            # Stability counter
             if zone == s["prev_zone"]:
                 s["stable"] += 1
             else:
                 s["stable"] = 1
             s["prev_zone"] = zone
 
-            # Rep counting logic
             if zone == "up" and s["stable"] >= self.STABILITY_FRAMES:
                 if s["squat_state"] == "down":
-                    rep_done = True   # transition from squat to stand completes a rep
+                    rep_done = True
                 s["squat_state"] = "up"
                 feedback = f"{int(angle)}° – Squat DOWN!"
             elif zone == "down" and s["stable"] >= self.STABILITY_FRAMES:
@@ -137,20 +119,13 @@ class ExerciseAnalyzer:
 
             colors[(hip, knee)] = (0, 255, 0)
             colors[(knee, ank)] = (0, 255, 0)
-            break   # only process one visible leg
-
+            break
         return feedback, colors, rep_done
 
     def get_rep_quality(self, last_feedback=""):
-        """
-        Return a quality score 0.0–1.0 based on feedback.
-        Currently returns 1.0 (perfect) because the stability filter already ensures good form.
-        You can enhance this later by analysing shoulder sway / knee valgus.
-        """
         return 1.0
 
     def draw_feedback(self, img, feedback, rep_count, exercise):
-        """Overlay exercise name, rep count, and feedback on the video frame."""
         cv2.putText(img, f"{exercise} | Reps: {rep_count}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         cv2.putText(img, feedback, (10, 65),
