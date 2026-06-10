@@ -11,8 +11,7 @@ class ExerciseAnalyzer:
         "left_ankle": 15, "right_ankle": 16
     }
 
-    # Increased to avoid double‑counting from tiny oscillations
-    STABILITY_FRAMES = 5   # ~0.33 sec at 15 fps
+    STABILITY_FRAMES = 8   # ~0.5 sec hold at 15 fps
 
     def calc_angle(self, a, b, c):
         a = np.array(a[:2], dtype=np.float32)
@@ -40,12 +39,13 @@ class ExerciseAnalyzer:
         s.setdefault("curl_state", "down")
         s.setdefault("stable", 0)
         s.setdefault("prev_zone", None)
+        s.setdefault("shoulder_warn", 0)
 
         feedback = "Position arm in view"
         colors = {}
         rep_done = False
-        DOWN = 145   # extended
-        UP = 75      # curled
+        DOWN = 145
+        UP = 75
 
         for side in ("right", "left"):
             sh = self.KP[f"{side}_shoulder"]
@@ -76,6 +76,17 @@ class ExerciseAnalyzer:
 
             colors[(sh, el)] = (0, 255, 0)
             colors[(el, wr)] = (0, 255, 0)
+
+            # Shoulder stability check
+            hip_y = kp[self.KP[f"{side}_hip"]][1]
+            shoulder_y = kp[sh][1]
+            if shoulder_y - hip_y > 25:
+                feedback += " | Keep shoulders steady!"
+                colors[(sh, el)] = (0, 0, 255)
+                s["shoulder_warn"] = 1
+            else:
+                s["shoulder_warn"] = 0
+
             break
         return feedback, colors, rep_done
 
@@ -83,17 +94,20 @@ class ExerciseAnalyzer:
         s.setdefault("squat_state", "up")
         s.setdefault("stable", 0)
         s.setdefault("prev_zone", None)
+        s.setdefault("knee_warn", 0)
+        s.setdefault("back_warn", 0)
 
         feedback = "Position legs in view"
         colors = {}
         rep_done = False
-        STAND = 150   # standing
-        DOWN = 100    # deep squat
+        STAND = 150
+        DOWN = 100
 
         for side in ("right", "left"):
             hip = self.KP[f"{side}_hip"]
             knee = self.KP[f"{side}_knee"]
             ank = self.KP[f"{side}_ankle"]
+            sh = self.KP[f"{side}_shoulder"]
             if not all(self._is_visible(kp, i) for i in (hip, knee, ank)):
                 continue
 
@@ -119,11 +133,47 @@ class ExerciseAnalyzer:
 
             colors[(hip, knee)] = (0, 255, 0)
             colors[(knee, ank)] = (0, 255, 0)
+
+            # Knee over toe check
+            if kp[knee][0] - kp[ank][0] > 40:
+                feedback += " | Knees too far forward!"
+                colors[(knee, ank)] = (0, 0, 255)
+                s["knee_warn"] = 1
+            else:
+                s["knee_warn"] = 0
+
+            # Back angle check
+            if self._is_visible(kp, sh):
+                torso_angle = np.degrees(np.arctan2(kp[sh][0] - kp[hip][0], kp[sh][1] - kp[hip][1]))
+                if abs(torso_angle) < 20:
+                    feedback += " | Keep back straight!"
+                    colors[(sh, hip)] = (0, 0, 255)
+                    s["back_warn"] = 1
+                else:
+                    s["back_warn"] = 0
             break
         return feedback, colors, rep_done
 
-    def get_rep_quality(self, last_feedback=""):
-        return 1.0
+    def get_rep_quality(self, last_feedback="", rep_state=None):
+        """
+        Returns a quality score 0.0–1.0 based on feedback and warning flags.
+        """
+        score = 1.0
+        if last_feedback:
+            if "Keep shoulders steady" in last_feedback:
+                score -= 0.3
+            if "Knees too far forward" in last_feedback:
+                score -= 0.3
+            if "Keep back straight" in last_feedback:
+                score -= 0.3
+        if rep_state:
+            if rep_state.get("shoulder_warn"):
+                score -= 0.3
+            if rep_state.get("knee_warn"):
+                score -= 0.3
+            if rep_state.get("back_warn"):
+                score -= 0.3
+        return max(0.3, score)
 
     def draw_feedback(self, img, feedback, rep_count, exercise):
         cv2.putText(img, f"{exercise} | Reps: {rep_count}", (10, 30),
