@@ -1,0 +1,41 @@
+import cv2
+import mediapipe as mp
+import math
+import sys
+
+mp_pose = mp.solutions.pose
+
+def calculate_angle(a, b, c):
+    ang = math.degrees(math.atan2(c[1]-b[1], c[0]-b[0]) - math.atan2(a[1]-b[1], a[0]-b[0]))
+    ang = abs(ang)
+    if ang > 180:
+        ang = 360 - ang
+    return ang
+
+def analyze_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+    good_reps = 0
+    total_frames = 0
+    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            total_frames += 1
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = pose.process(image)
+            if results.pose_landmarks:
+                lm = results.pose_landmarks.landmark
+                hip = [lm[23].x, lm[23].y]
+                knee = [lm[25].x, lm[25].y]
+                ankle = [lm[27].x, lm[27].y]
+                knee_angle = calculate_angle(hip, knee, ankle)
+                if 70 < knee_angle < 100:
+                    good_reps += 1
+    cap.release()
+    verdict = "GOOD" if good_reps > total_frames * 0.2 else "BAD"
+    return {"video": video_path, "verdict": verdict, "good_frames": good_reps, "total": total_frames}
+
+if __name__ == "__main__":
+    path = sys.argv[1] if len(sys.argv) > 1 else "test_videos/squat_good.mp4"
+    print(analyze_video(path))
