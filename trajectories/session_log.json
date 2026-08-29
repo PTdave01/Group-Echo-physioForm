@@ -1,0 +1,27 @@
+{
+  "session_id": "demo_001",
+  "video": "test_videos/squat_mistake.mp4",
+  "frames_analyzed": 98,
+  "agents_trajectory": [
+    {
+      "agent": "recognizer",
+      "output": {"exercise": "squat", "confidence": 0.92},
+      "reasoning": "Knee and hip displacement large, matches squat pattern"
+    },
+    {
+      "agent": "form_analyst",
+      "output": {"knee_angle": 112.5, "faults": ["knees_caving_in", "not_deep_enough"], "quality_score": 5.0},
+      "reasoning": "Knee x distance from ankle 0.11 > threshold 0.08, angle 112 > 110"
+    },
+    {
+      "agent": "coach",
+      "output": "Push your knees out over your toes — keep them aligned! | Go a little deeper — aim for thighs parallel to floor.",
+      "reasoning": "Mapped faults to patient-friendly cues"
+    },
+    {
+      "agent": "tracker",
+      "output": {"avg_quality": 5.0, "clinician_summary": "Session: 8 reps, Avg Quality 5.0/10, Adherence 100%. Main issue: knees_caving_in (6x). Recommendation: Glute activation drills."}
+    }
+  ],
+  "final_report": "Session: 8 reps, Avg Quality 5.0/10, Main issue: knees_caving_in. Baseline would have said GOOD. Agentic caught fault and explained why."
+}
